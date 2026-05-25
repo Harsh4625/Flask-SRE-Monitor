@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>SRE Monitor</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0a0e14;
+    --surface: #0f1620;
+    --border: #1a2940;
+    --accent: #00d4ff;
+    --accent2: #00ff9d;
+    --warn: #ffb700;
+    --danger: #ff4757;
+    --text: #c8d6e5;
+    --muted: #4a6080;
+    --font-mono: 'Share Tech Mono', monospace;
+    --font-ui: 'Rajdhani', sans-serif;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 2rem; }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 2.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  .logo-icon {
+    width: 42px; height: 42px;
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem;
+    color: var(--accent);
+    box-shadow: 0 0 12px rgba(0,212,255,0.3);
+    animation: pulse-border 3s ease-in-out infinite;
+  }
+  @keyframes pulse-border {
+    0%,100% { box-shadow: 0 0 12px rgba(0,212,255,0.3); }
+    50%      { box-shadow: 0 0 24px rgba(0,212,255,0.6); }
+  }
+  .logo-text h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: #fff; }
+  .logo-text p  { font-family: var(--font-mono); font-size: 0.7rem; color: var(--muted); letter-spacing: 2px; }
+
+  .header-right { display: flex; align-items: center; gap: 1.5rem; }
+  .live-badge {
+    display: flex; align-items: center; gap: 0.5rem;
+    font-family: var(--font-mono); font-size: 0.75rem;
+    color: var(--accent2); letter-spacing: 1px;
+  }
+  .live-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--accent2);
+    animation: blink 1.2s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+  #clock { font-family: var(--font-mono); font-size: 0.85rem; color: var(--muted); }
+
+  /* Status bar */
+  .status-bar {
+    display: flex; gap: 0.5rem; margin-bottom: 2rem; flex-wrap: wrap;
+  }
+  .status-chip {
+    font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 1px;
+    padding: 0.3rem 0.8rem; border-radius: 4px;
+    border: 1px solid;
+    display: flex; align-items: center; gap: 0.4rem;
+  }
+  .chip-ok      { border-color: var(--accent2); color: var(--accent2); background: rgba(0,255,157,0.06); }
+  .chip-warn    { border-color: var(--warn);    color: var(--warn);    background: rgba(255,183,0,0.06); }
+  .chip-danger  { border-color: var(--danger);  color: var(--danger);  background: rgba(255,71,87,0.06); }
+
+  /* Grid layout */
+  .grid-top    { display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; margin-bottom: 1rem; }
+  .grid-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.4rem 1.6rem;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+  .card:hover { border-color: rgba(0,212,255,0.3); }
+  .card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0.5;
+  }
+  .card-label {
+    font-family: var(--font-mono); font-size: 0.65rem; letter-spacing: 2px;
+    color: var(--muted); text-transform: uppercase; margin-bottom: 0.8rem;
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .card-label span { color: var(--accent); }
+  .card-value {
+    font-size: 2.4rem; font-weight: 700; line-height: 1;
+    color: #fff; letter-spacing: -1px;
+  }
+  .card-value .unit { font-size: 1rem; color: var(--muted); font-weight: 400; margin-left: 4px; }
+  .card-sub { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); margin-top: 0.5rem; }
+
+  /* Gauge bars */
+  .gauge-wrap { margin-top: 1rem; }
+  .gauge-header { display: flex; justify-content: space-between; margin-bottom: 0.4rem; }
+  .gauge-header span { font-family: var(--font-mono); font-size: 0.7rem; color: var(--muted); }
+  .gauge-track {
+    height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;
+  }
+  .gauge-fill {
+    height: 100%; border-radius: 3px;
+    transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+  }
+  .gauge-fill.warn   { background: linear-gradient(90deg, var(--warn), #ff8c00); }
+  .gauge-fill.danger { background: linear-gradient(90deg, var(--danger), #ff6b81); }
+
+  /* Health endpoint card */
+  .endpoint-list { margin-top: 0.8rem; display: flex; flex-direction: column; gap: 0.6rem; }
+  .endpoint-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.6rem 0.8rem;
+    background: rgba(0,212,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: var(--font-mono); font-size: 0.78rem;
+    transition: background 0.2s;
+    cursor: default;
+  }
+  .endpoint-row:hover { background: rgba(0,212,255,0.07); }
+  .ep-path { color: var(--accent); }
+  .ep-badge {
+    padding: 2px 8px; border-radius: 3px; font-size: 0.65rem; letter-spacing: 1px;
+  }
+  .ep-200 { background: rgba(0,255,157,0.12); color: var(--accent2); }
+  .ep-err { background: rgba(255,71,87,0.12); color: var(--danger); }
+  .ep-ping { color: var(--muted); font-size: 0.65rem; }
+
+  /* Log stream */
+  .log-stream {
+    margin-top: 0.8rem;
+    height: 180px; overflow-y: auto;
+    font-family: var(--font-mono); font-size: 0.72rem;
+    line-height: 1.7;
+  }
+  .log-stream::-webkit-scrollbar { width: 4px; }
+  .log-stream::-webkit-scrollbar-track { background: transparent; }
+  .log-stream::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .log-entry { display: flex; gap: 0.8rem; opacity: 0; animation: fadeIn 0.4s forwards; }
+  @keyframes fadeIn { to { opacity: 1; } }
+  .log-time { color: var(--muted); flex-shrink: 0; }
+  .log-level-info   { color: var(--accent);  }
+  .log-level-warn   { color: var(--warn);    }
+  .log-level-error  { color: var(--danger);  }
+  .log-level-ok     { color: var(--accent2); }
+  .log-msg { color: var(--text); }
+
+  /* Refresh btn */
+  .refresh-btn {
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 1px;
+    padding: 0.4rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .refresh-btn:hover { background: rgba(0,212,255,0.1); }
+  .refresh-btn:active { transform: scale(0.97); }
+
+  /* Footer */
+  footer {
+    margin-top: 2rem; padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  footer span { font-family: var(--font-mono); font-size: 0.65rem; color: var(--muted); letter-spacing: 1px; }
+
+  @media (max-width: 700px) {
+    .grid-top    { grid-template-columns: 1fr; }
+    .grid-bottom { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">⬡</div>
+      <div class="logo-text">
+        <h1>SRE Monitor</h1>
+        <p>SYSTEM RELIABILITY DASHBOARD</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+      <div id="clock">--:--:--</div>
+      <button class="refresh-btn" onclick="fetchAll()">↻ REFRESH</button>
+    </div>
+  </header>
+
+  <!-- Status chips -->
+  <div class="status-bar" id="status-bar">
+    <div class="status-chip chip-ok">● FLASK OK</div>
+    <div class="status-chip chip-ok">● NGINX OK</div>
+    <div class="status-chip chip-ok" id="chip-health">● HEALTH CHECKING...</div>
+  </div>
+
+  <!-- Top row: 3 metric cards -->
+  <div class="grid-top">
+    <div class="card">
+      <div class="card-label"><span>//</span> CPU USAGE</div>
+      <div class="card-value" id="cpu-val">--<span class="unit">%</span></div>
+      <div class="gauge-wrap">
+        <div class="gauge-header"><span>0%</span><span>100%</span></div>
+        <div class="gauge-track"><div class="gauge-fill" id="cpu-bar" style="width:0%"></div></div>
+      </div>
+      <div class="card-sub" id="cpu-sub">awaiting data...</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label"><span>//</span> MEMORY</div>
+      <div class="card-value" id="mem-val">--<span class="unit">%</span></div>
+      <div class="gauge-wrap">
+        <div class="gauge-header"><span>0%</span><span>100%</span></div>
+        <div class="gauge-track"><div class="gauge-fill" id="mem-bar" style="width:0%"></div></div>
+      </div>
+      <div class="card-sub" id="mem-sub">awaiting data...</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label"><span>//</span> DISK</div>
+      <div class="card-value" id="disk-val">--<span class="unit">%</span></div>
+      <div class="gauge-wrap">
+        <div class="gauge-header"><span>0%</span><span>100%</span></div>
+        <div class="gauge-track"><div class="gauge-fill" id="disk-bar" style="width:0%"></div></div>
+      </div>
+      <div class="card-sub" id="disk-sub">awaiting data...</div>
+    </div>
+  </div>
+
+  <!-- Bottom row -->
+  <div class="grid-bottom">
+
+    <!-- Endpoint status -->
+    <div class="card">
+      <div class="card-label"><span>//</span> API ENDPOINTS</div>
+      <div class="endpoint-list" id="endpoint-list">
+        <div class="endpoint-row">
+          <span class="ep-path">GET /</span>
+          <span class="ep-badge ep-200" id="ep-root">---</span>
+          <span class="ep-ping" id="ep-root-ping">--ms</span>
+        </div>
+        <div class="endpoint-row">
+          <span class="ep-path">GET /health</span>
+          <span class="ep-badge ep-200" id="ep-health">---</span>
+          <span class="ep-ping" id="ep-health-ping">--ms</span>
+        </div>
+        <div class="endpoint-row">
+          <span class="ep-path">GET /status</span>
+          <span class="ep-badge ep-200" id="ep-status">---</span>
+          <span class="ep-ping" id="ep-status-ping">--ms</span>
+        </div>
+        <div class="endpoint-row">
+          <span class="ep-path">GET /metrics</span>
+          <span class="ep-badge ep-200" id="ep-metrics">---</span>
+          <span class="ep-ping" id="ep-metrics-ping">--ms</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live log stream -->
+    <div class="card">
+      <div class="card-label"><span>//</span> LIVE EVENT LOG</div>
+      <div class="log-stream" id="log-stream"></div>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <span>FLASK SRE MONITOR v1.0 · NGINX/1.31 · DOCKER</span>
+    <span id="uptime-footer">UPTIME: --</span>
+  </footer>
+
+</div>
+
+<script>
+// ── Clock ────────────────────────────────────────────
+function updateClock() {
+  document.getElementById('clock').textContent =
+    new Date().toUTCString().split(' ')[4] + ' UTC';
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ── Logging ──────────────────────────────────────────
+const logStream = document.getElementById('log-stream');
+function addLog(level, msg) {
+  const now = new Date().toUTCString().split(' ')[4];
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML = `<span class="log-time">${now}</span>
+    <span class="log-level-${level}">[${level.toUpperCase()}]</span>
+    <span class="log-msg">${msg}</span>`;
+  logStream.appendChild(entry);
+  logStream.scrollTop = logStream.scrollHeight;
+  // Keep max 40 lines
+  while (logStream.children.length > 40) logStream.removeChild(logStream.firstChild);
+}
+
+// ── Gauge helper ─────────────────────────────────────
+function setGauge(barId, pct) {
+  const el = document.getElementById(barId);
+  el.style.width = pct + '%';
+  el.classList.remove('warn','danger');
+  if (pct > 85) el.classList.add('danger');
+  else if (pct > 60) el.classList.add('warn');
+}
+
+// ── Ping endpoint ─────────────────────────────────────
+async function ping(path, badgeId, pingId) {
+  const t0 = performance.now();
+  try {
+    const r = await fetch(path);
+    const ms = Math.round(performance.now() - t0);
+    document.getElementById(badgeId).textContent = r.status;
+    document.getElementById(badgeId).className = 'ep-badge ' + (r.ok ? 'ep-200' : 'ep-err');
+    document.getElementById(pingId).textContent = ms + 'ms';
+    return { ok: r.ok, ms };
+  } catch(e) {
+    document.getElementById(badgeId).textContent = 'ERR';
+    document.getElementById(badgeId).className = 'ep-badge ep-err';
+    document.getElementById(pingId).textContent = '--ms';
+    return { ok: false };
+  }
+}
+
+// ── Fetch /metrics ────────────────────────────────────
+async function fetchMetrics() {
+  try {
+    const r = await fetch('/metrics');
+    const d = await r.json();
+
+    const cpu = d.cpu_percent;
+    document.getElementById('cpu-val').innerHTML = `${cpu}<span class="unit">%</span>`;
+    setGauge('cpu-bar', cpu);
+    document.getElementById('cpu-sub').textContent = `${cpu > 60 ? '⚠ HIGH' : 'NORMAL'} LOAD`;
+
+    const mem = d.memory.percent;
+    document.getElementById('mem-val').innerHTML = `${mem}<span class="unit">%</span>`;
+    setGauge('mem-bar', mem);
+    document.getElementById('mem-sub').textContent =
+      `${d.memory.used_mb.toFixed(0)} MB / ${d.memory.total_mb.toFixed(0)} MB`;
+
+    const disk = d.disk.percent;
+    document.getElementById('disk-val').innerHTML = `${disk}<span class="unit">%</span>`;
+    setGauge('disk-bar', disk);
+    document.getElementById('disk-sub').textContent =
+      `${d.disk.used_gb.toFixed(1)} GB / ${d.disk.total_gb.toFixed(1)} GB`;
+
+    addLog('ok', `metrics polled — cpu:${cpu}% mem:${mem}% disk:${disk}%`);
+  } catch(e) {
+    addLog('error', 'failed to fetch /metrics');
+  }
+}
+
+// ── Fetch /status ─────────────────────────────────────
+async function fetchStatus() {
+  try {
+    const r = await fetch('/status');
+    const d = await r.json();
+    const up = d.uptime_seconds;
+    const hh = Math.floor(up/3600), mm = Math.floor((up%3600)/60), ss = Math.floor(up%60);
+    const upStr = `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+    document.getElementById('uptime-footer').textContent = `UPTIME: ${upStr}`;
+    addLog('info', `status ok · host:${d.host} · env:${d.environment}`);
+  } catch(e) {
+    addLog('error', 'failed to fetch /status');
+  }
+}
+
+// ── Fetch /health ─────────────────────────────────────
+async function fetchHealth() {
+  try {
+    const r = await fetch('/health');
+    const d = await r.json();
+    const chip = document.getElementById('chip-health');
+    if (d.status === 'healthy') {
+      chip.textContent = '● HEALTHY';
+      chip.className = 'status-chip chip-ok';
+      addLog('ok', 'health check passed');
+    } else {
+      chip.textContent = '● UNHEALTHY';
+      chip.className = 'status-chip chip-danger';
+      addLog('error', 'health check FAILED');
+    }
+  } catch(e) {
+    addLog('error', 'health endpoint unreachable');
+  }
+}
+
+// ── Ping all endpoints ────────────────────────────────
+async function pingAll() {
+  const results = await Promise.all([
+    ping('/', 'ep-root', 'ep-root-ping'),
+    ping('/health', 'ep-health', 'ep-health-ping'),
+    ping('/status', 'ep-status', 'ep-status-ping'),
+    ping('/metrics', 'ep-metrics', 'ep-metrics-ping'),
+  ]);
+  const allOk = results.every(r => r.ok);
+  if (!allOk) addLog('warn', 'one or more endpoints returned non-200');
+}
+
+// ── Master refresh ────────────────────────────────────
+async function fetchAll() {
+  addLog('info', 'polling all endpoints...');
+  await Promise.all([fetchMetrics(), fetchStatus(), fetchHealth(), pingAll()]);
+}
+
+// ── Auto-poll every 10s ───────────────────────────────
+fetchAll();
+setInterval(fetchAll, 10000);
+</script>
+</body>
+</html>
